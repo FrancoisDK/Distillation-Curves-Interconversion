@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include CONTRIBUTING.md
+include QUICK_REFERENCE.md
+include ARCHITECTURE.md
+include GETTING_STARTED.md
+recursive-include examples *.ipynb
+recursive-include tests *.py
+recursive-include Distillation_Curve_interconv *.csv
