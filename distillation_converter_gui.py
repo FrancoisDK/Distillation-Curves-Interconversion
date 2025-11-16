@@ -1531,8 +1531,8 @@ def main():
     # Configure matplotlib to respect PySide6 theme after QApplication is created
     # This ensures charts match the application UI style
     palette = app.palette()
-    text_color = palette.color(palette.WindowText)
-    bg_color = palette.color(palette.Window)
+    text_color = palette.color(palette.windowText)
+    bg_color = palette.color(palette.window)
     
     # Update matplotlib colors to match system theme
     matplotlib.rcParams['figure.facecolor'] = bg_color.name()
