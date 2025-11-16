@@ -1,0 +1,58 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.12', '3.13']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install pytest pytest-cov
+    
+    - name: Lint with flake8 (optional)
+      continue-on-error: true
+      run: |
+        pip install flake8
+        flake8 bp_conversions.py --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short
+    
+    - name: Generate coverage report
+      run: |
+        pytest tests/ --cov=. --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+    
+    - name: Test GUI imports (no display)
+      env:
+        QT_QPA_PLATFORM: offscreen
+      run: |
+        python -c "from distillation_converter_gui import DistillationConverterGUI; print('GUI import successful')"
