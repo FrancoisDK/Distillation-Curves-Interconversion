@@ -68,3 +68,11 @@ Changelog = "https://github.com/FrancoisDK/Distillation-Curves-Interconversion/r
 
 [project.scripts]
 distillation-gui = "distillation_converter_gui:main"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "bp_conversions.py",
+    "distillation_converter_gui.py", 
+    "distillation_api.py",
+    "batch_processor.py",
+]

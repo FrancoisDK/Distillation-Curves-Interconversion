@@ -480,6 +480,19 @@ class DistillationConverterGUI(QMainWindow):
         self.calculate_btn.setDefault(True)  # Make it the default button
         layout.addWidget(self.calculate_btn)
         
+        # Import buttons - use native styling
+        import_layout = QHBoxLayout()
+        
+        self.import_csv_btn = QPushButton("📥 Import CSV")
+        self.import_csv_btn.clicked.connect(self.import_csv)
+        import_layout.addWidget(self.import_csv_btn)
+        
+        self.import_excel_btn = QPushButton("📥 Import Excel")
+        self.import_excel_btn.clicked.connect(self.import_excel)
+        import_layout.addWidget(self.import_excel_btn)
+        
+        layout.addLayout(import_layout)
+        
         # Export buttons - use native styling
         export_layout = QVBoxLayout()
         
@@ -1043,6 +1056,192 @@ class DistillationConverterGUI(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Export Error", 
                                f"Error exporting data:\n{str(e)}")
+    
+    def import_csv(self):
+        """Import distillation data from CSV file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Import CSV File", "", "CSV Files (*.csv);;All Files (*.*)")
+        if not file_path:
+            return
+        
+        try:
+            import pandas as pd
+            
+            # Read CSV file
+            df = pd.read_csv(file_path)
+            
+            # Auto-detect columns (case-insensitive)
+            columns_lower = [col.lower() for col in df.columns]
+            
+            # Find volume column
+            vol_col = None
+            for i, col_lower in enumerate(columns_lower):
+                if any(x in col_lower for x in ['vol', 'percentage', '%', 'cut']):
+                    vol_col = df.columns[i]
+                    break
+            
+            # Find temperature column
+            temp_col = None
+            for i, col_lower in enumerate(columns_lower):
+                if any(x in col_lower for x in ['temp', 'temperature', '°c', 'celsius', 'c', 'deg']):
+                    temp_col = df.columns[i]
+                    break
+            
+            # Find density column (optional)
+            dens_col = None
+            for i, col_lower in enumerate(columns_lower):
+                if any(x in col_lower for x in ['dens', 'density', 'kg/m', 'kg/m3']):
+                    dens_col = df.columns[i]
+                    break
+            
+            if vol_col is None or temp_col is None:
+                available = ", ".join(df.columns)
+                QMessageBox.warning(self, "Import Error",
+                    f"Could not auto-detect required columns.\n\n"
+                    f"Looking for: Volume (%) and Temperature (°C) columns\n\n"
+                    f"Available columns: {available}\n\n"
+                    f"Please rename columns to include 'Vol' and 'Temp'")
+                return
+            
+            # Clear existing data
+            self.input_table.setRowCount(0)
+            
+            # Import data
+            for idx, row in df.iterrows():
+                try:
+                    vol = float(row[vol_col])
+                    temp = float(row[temp_col])
+                    
+                    # Add row to table
+                    row_pos = self.input_table.rowCount()
+                    self.input_table.insertRow(row_pos)
+                    
+                    vol_item = QTableWidgetItem(str(vol))
+                    temp_item = QTableWidgetItem(str(temp))
+                    
+                    self.input_table.setItem(row_pos, 0, vol_item)
+                    self.input_table.setItem(row_pos, 1, temp_item)
+                except (ValueError, KeyError):
+                    # Skip rows with invalid data
+                    continue
+            
+            # Update density if available
+            if dens_col is not None and len(df) > 0:
+                try:
+                    density = float(df[dens_col].iloc[0])
+                    if 600 <= density <= 1200:
+                        self.density_input.setValue(density)
+                except (ValueError, TypeError):
+                    pass
+            
+            # Auto-detect input type from filename
+            filename_lower = file_path.lower()
+            if 'd2887' in filename_lower:
+                self.input_type_combo.setCurrentText("D2887")
+            elif 'tbp' in filename_lower or 'atm' in filename_lower:
+                self.input_type_combo.setCurrentText("TBP")
+            else:
+                self.input_type_combo.setCurrentText("D86")
+            
+            rows_imported = self.input_table.rowCount()
+            QMessageBox.information(self, "Import Successful",
+                f"Imported {rows_imported} data points from CSV")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error",
+                f"Error importing CSV file:\n{str(e)}")
+    
+    def import_excel(self):
+        """Import distillation data from Excel file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Import Excel File", "", "Excel Files (*.xlsx *.xls);;All Files (*.*)")
+        if not file_path:
+            return
+        
+        try:
+            import pandas as pd
+            
+            # Read Excel file (first sheet)
+            df = pd.read_excel(file_path)
+            
+            # Auto-detect columns (case-insensitive)
+            columns_lower = [col.lower() for col in df.columns]
+            
+            # Find volume column
+            vol_col = None
+            for i, col_lower in enumerate(columns_lower):
+                if any(x in col_lower for x in ['vol', 'percentage', '%', 'cut']):
+                    vol_col = df.columns[i]
+                    break
+            
+            # Find temperature column
+            temp_col = None
+            for i, col_lower in enumerate(columns_lower):
+                if any(x in col_lower for x in ['temp', 'temperature', '°c', 'celsius', 'c', 'deg']):
+                    temp_col = df.columns[i]
+                    break
+            
+            # Find density column (optional)
+            dens_col = None
+            for i, col_lower in enumerate(columns_lower):
+                if any(x in col_lower for x in ['dens', 'density', 'kg/m', 'kg/m3']):
+                    dens_col = df.columns[i]
+                    break
+            
+            if vol_col is None or temp_col is None:
+                available = ", ".join(df.columns)
+                QMessageBox.warning(self, "Import Error",
+                    f"Could not auto-detect required columns.\n\n"
+                    f"Looking for: Volume (%) and Temperature (°C) columns\n\n"
+                    f"Available columns: {available}\n\n"
+                    f"Please rename columns to include 'Vol' and 'Temp'")
+                return
+            
+            # Clear existing data
+            self.input_table.setRowCount(0)
+            
+            # Import data
+            for idx, row in df.iterrows():
+                try:
+                    vol = float(row[vol_col])
+                    temp = float(row[temp_col])
+                    
+                    # Add row to table
+                    row_pos = self.input_table.rowCount()
+                    self.input_table.insertRow(row_pos)
+                    
+                    vol_item = QTableWidgetItem(str(vol))
+                    temp_item = QTableWidgetItem(str(temp))
+                    
+                    self.input_table.setItem(row_pos, 0, vol_item)
+                    self.input_table.setItem(row_pos, 1, temp_item)
+                except (ValueError, KeyError):
+                    # Skip rows with invalid data
+                    continue
+            
+            # Update density if available
+            if dens_col is not None and len(df) > 0:
+                try:
+                    density = float(df[dens_col].iloc[0])
+                    if 600 <= density <= 1200:
+                        self.density_input.setValue(density)
+                except (ValueError, TypeError):
+                    pass
+            
+            # Auto-detect input type from filename
+            filename_lower = file_path.lower()
+            if 'd2887' in filename_lower:
+                self.input_type_combo.setCurrentText("D2887")
+            elif 'tbp' in filename_lower or 'atm' in filename_lower:
+                self.input_type_combo.setCurrentText("TBP")
+            else:
+                self.input_type_combo.setCurrentText("D86")
+            
+            rows_imported = self.input_table.rowCount()
+            QMessageBox.information(self, "Import Successful",
+                f"Imported {rows_imported} data points from Excel")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error",
+                f"Error importing Excel file:\n{str(e)}")
 
 
 def main():
