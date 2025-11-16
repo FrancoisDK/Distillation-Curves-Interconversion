@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                 QCheckBox, QDoubleSpinBox, QFormLayout, QSpacerItem, 
                                 QSizePolicy, QTabWidget, QMenu)
 from PySide6.QtCore import Qt, QEvent, QPoint
-from PySide6.QtGui import QFont, QKeyEvent, QAction
+from PySide6.QtGui import QFont, QKeyEvent, QAction, QPalette
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -1531,8 +1531,9 @@ def main():
     # Configure matplotlib to respect PySide6 theme after QApplication is created
     # This ensures charts match the application UI style
     palette = app.palette()
-    text_color = palette.color(palette.windowText)
-    bg_color = palette.color(palette.window)
+    # Use the correct QPalette color roles
+    text_color = palette.color(QPalette.ColorRole.WindowText)
+    bg_color = palette.color(QPalette.ColorRole.Window)
     
     # Update matplotlib colors to match system theme
     matplotlib.rcParams['figure.facecolor'] = bg_color.name()
