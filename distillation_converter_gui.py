@@ -17,7 +17,26 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
+
+# Configure matplotlib to use Windows native theme
+# Automatically detects system light/dark mode
+try:
+    # Try to use the system theme - detects Windows 10/11 dark mode
+    matplotlib.rcParams['figure.facecolor'] = 'white'
+    matplotlib.rcParams['axes.facecolor'] = 'white'
+    # Use system-appropriate colors for text
+    if sys.platform == 'win32':
+        # Windows: use default which respects system colors
+        matplotlib.rcParams['text.color'] = 'black'
+        matplotlib.rcParams['axes.labelcolor'] = 'black'
+        matplotlib.rcParams['xtick.color'] = 'black'
+        matplotlib.rcParams['ytick.color'] = 'black'
+        matplotlib.rcParams['axes.edgecolor'] = '#cccccc'
+        matplotlib.rcParams['grid.color'] = '#e0e0e0'
+except:
+    pass
 
 # Import the Oil class from bp_conversions
 import sys
@@ -1506,11 +1525,24 @@ class DistillationConverterGUI(QMainWindow):
 
 
 def main():
-    """Main application entry point"""
+    """Main application entry point with full Windows native theming"""
     app = QApplication(sys.argv)
     
+    # Configure matplotlib to respect PySide6 theme after QApplication is created
+    # This ensures charts match the application UI style
+    palette = app.palette()
+    text_color = palette.color(palette.WindowText)
+    bg_color = palette.color(palette.Window)
+    
+    # Update matplotlib colors to match system theme
+    matplotlib.rcParams['figure.facecolor'] = bg_color.name()
+    matplotlib.rcParams['axes.facecolor'] = bg_color.name()
+    matplotlib.rcParams['text.color'] = text_color.name()
+    matplotlib.rcParams['axes.labelcolor'] = text_color.name()
+    matplotlib.rcParams['xtick.color'] = text_color.name()
+    matplotlib.rcParams['ytick.color'] = text_color.name()
+    
     # Use native Windows theme - automatically adapts to system light/dark theme
-    # Remove custom stylesheets to allow Windows native theming
     try:
         # Try to use Windows 11 style first (most modern)
         app.setStyle('windows11')
