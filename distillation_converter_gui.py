@@ -419,7 +419,7 @@ class DistillationConverterGUI(QMainWindow):
         
         # Info label explaining which density source is active
         self.density_info_label = QLabel("Using: Spinbox value (800.0 kg/m³)")
-        self.density_info_label.setStyleSheet("color: #666; font-style: italic; font-size: 10px;")
+        self.density_info_label.setStyleSheet("font-style: italic; font-size: 10px;")  # Uses system text color
         density_layout.addWidget(self.density_info_label)
         
         density_group.setLayout(density_layout)
@@ -437,7 +437,7 @@ class DistillationConverterGUI(QMainWindow):
         # Instructions for paste
         paste_instructions = QLabel("💡 Tip: Press Enter to move to next row. Right-click for Copy/Paste menu. Ctrl+C to copy, Ctrl+V to paste.")
         paste_instructions.setWordWrap(True)
-        paste_instructions.setStyleSheet("font-style: italic; color: gray;")
+        paste_instructions.setStyleSheet("font-style: italic;")  # Uses system text color for light/dark theme
         table_layout.addWidget(paste_instructions)
         
         # Table widget - using custom interactive table
@@ -660,11 +660,12 @@ class DistillationConverterGUI(QMainWindow):
         
         # Update info label and styling
         if use_spinbox:
-            self.density_spinbox.setStyleSheet("")  # Normal style
+            self.density_spinbox.setStyleSheet("")  # Use system style
             self.density_info_label.setText(f"Using: Spinbox value ({self.density_spinbox.value():.1f} kg/m³)")
         else:
-            # Grey out spinbox when table data is active
-            self.density_spinbox.setStyleSheet("QDoubleSpinBox { color: #999; background-color: #f0f0f0; }")
+            # Disabled state uses native Windows appearance automatically
+            # Just clear any custom styling to let system handle it
+            self.density_spinbox.setStyleSheet("")
             if self.input_densities:
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 self.density_info_label.setText(f"Using: Table data ({len(self.input_densities)} cuts, avg {avg_density:.1f} kg/m³)")
@@ -1508,18 +1509,24 @@ def main():
     """Main application entry point"""
     app = QApplication(sys.argv)
     
-    # Use Windows 11/10 native style - automatically uses current Windows styling
-    # Try different Windows styles in order of preference
+    # Use native Windows theme - automatically adapts to system light/dark theme
+    # Remove custom stylesheets to allow Windows native theming
     try:
-        # PySide6 on Windows typically uses 'Windows' style by default
-        # which automatically adapts to Windows 10/11
-        app.setStyle('Windows')
+        # Try to use Windows 11 style first (most modern)
+        app.setStyle('windows11')
     except:
-        # Fallback to windowsvista if Windows style not available
+        # Fallback to Windows Vista style for older systems
         try:
             app.setStyle('windowsvista')
         except:
-            pass  # Use default style
+            # Fallback to generic Windows style
+            try:
+                app.setStyle('Windows')
+            except:
+                pass  # Use default system style
+    
+    # Use system color palette for proper light/dark theme support
+    app.setApplicationStyle(app.style())
     
     window = DistillationConverterGUI()
     window.show()
