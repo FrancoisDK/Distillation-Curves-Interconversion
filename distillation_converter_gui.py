@@ -396,7 +396,15 @@ class DistillationConverterGUI(QMainWindow):
         
         # Density input
         density_group = QGroupBox("🧪 Material Properties")
-        density_layout = QFormLayout()
+        density_layout = QVBoxLayout()
+        
+        # Density spinbox with checkbox for using spinbox vs table data
+        spinbox_layout = QHBoxLayout()
+        
+        self.use_spinbox_density = QCheckBox("Use spinbox value for all cuts")
+        self.use_spinbox_density.setChecked(True)
+        self.use_spinbox_density.stateChanged.connect(self.on_density_source_changed)
+        spinbox_layout.addWidget(self.use_spinbox_density)
         
         self.density_spinbox = QDoubleSpinBox()
         self.density_spinbox.setRange(600.0, 1200.0)
@@ -404,7 +412,15 @@ class DistillationConverterGUI(QMainWindow):
         self.density_spinbox.setSuffix(" kg/m³")
         self.density_spinbox.setDecimals(1)
         self.density_spinbox.valueChanged.connect(self.on_density_changed)
-        density_layout.addRow("Density:", self.density_spinbox)
+        spinbox_layout.addWidget(QLabel("Density:"))
+        spinbox_layout.addWidget(self.density_spinbox)
+        
+        density_layout.addLayout(spinbox_layout)
+        
+        # Info label explaining which density source is active
+        self.density_info_label = QLabel("Using: Spinbox value (800.0 kg/m³)")
+        self.density_info_label.setStyleSheet("color: #666; font-style: italic; font-size: 10px;")
+        density_layout.addWidget(self.density_info_label)
         
         density_group.setLayout(density_layout)
         layout.addWidget(density_group)
@@ -631,6 +647,29 @@ class DistillationConverterGUI(QMainWindow):
     def on_density_changed(self, value):
         """Handle density change"""
         self.density = value
+        # Update info label
+        if self.use_spinbox_density.isChecked():
+            self.density_info_label.setText(f"Using: Spinbox value ({value:.1f} kg/m³)")
+    
+    def on_density_source_changed(self, state):
+        """Handle density source checkbox change"""
+        use_spinbox = self.use_spinbox_density.isChecked()
+        
+        # Enable/disable spinbox based on checkbox
+        self.density_spinbox.setEnabled(use_spinbox)
+        
+        # Update info label and styling
+        if use_spinbox:
+            self.density_spinbox.setStyleSheet("")  # Normal style
+            self.density_info_label.setText(f"Using: Spinbox value ({self.density_spinbox.value():.1f} kg/m³)")
+        else:
+            # Grey out spinbox when table data is active
+            self.density_spinbox.setStyleSheet("QDoubleSpinBox { color: #999; background-color: #f0f0f0; }")
+            if self.input_densities:
+                avg_density = sum(self.input_densities.values()) / len(self.input_densities)
+                self.density_info_label.setText(f"Using: Table data ({len(self.input_densities)} cuts, avg {avg_density:.1f} kg/m³)")
+            else:
+                self.density_info_label.setText("Using: Table data (waiting for import)")
     
     def on_cell_changed(self, row, column):
         """Handle cell value change"""
@@ -1317,6 +1356,9 @@ class DistillationConverterGUI(QMainWindow):
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 if 600 <= avg_density <= 1200:
                     self.density_spinbox.setValue(avg_density)
+                # Auto-disable spinbox when table data is imported
+                self.use_spinbox_density.setChecked(False)
+                self.on_density_source_changed(False)
             elif dens_col is not None and len(df) > 0:
                 # If per-cut density data wasn't valid, use first value
                 try:
@@ -1431,6 +1473,9 @@ class DistillationConverterGUI(QMainWindow):
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 if 600 <= avg_density <= 1200:
                     self.density_spinbox.setValue(avg_density)
+                # Auto-disable spinbox when table data is imported
+                self.use_spinbox_density.setChecked(False)
+                self.on_density_source_changed(False)
             elif dens_col is not None and len(df) > 0:
                 # If per-cut density data wasn't valid, use first value
                 try:
