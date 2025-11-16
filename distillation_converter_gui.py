@@ -426,8 +426,8 @@ class DistillationConverterGUI(QMainWindow):
         
         # Table widget - using custom interactive table
         self.input_table = InteractiveTableWidget()
-        self.input_table.setColumnCount(2)
-        self.input_table.setHorizontalHeaderLabels(["Vol %", "Temperature (°C)"])
+        self.input_table.setColumnCount(3)
+        self.input_table.setHorizontalHeaderLabels(["Vol %", "Temperature (°C)", "Density (kg/m³)"])
         self.input_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.input_table.verticalHeader().setVisible(False)
         self.input_table.cellChanged.connect(self.on_cell_changed)
@@ -598,6 +598,10 @@ class DistillationConverterGUI(QMainWindow):
             # Temperature column (editable)
             temp_item = QTableWidgetItem("")
             self.input_table.setItem(i, 1, temp_item)
+            
+            # Density column (editable, optional)
+            dens_item = QTableWidgetItem("")
+            self.input_table.setItem(i, 2, dens_item)
         
         self.input_table.blockSignals(False)
     
@@ -620,9 +624,9 @@ class DistillationConverterGUI(QMainWindow):
         basis = self.basis_combo.currentText()
         # Update table header
         if "Volume" in basis:
-            self.input_table.setHorizontalHeaderLabels(["Vol %", "Temperature (°C)"])
+            self.input_table.setHorizontalHeaderLabels(["Vol %", "Temperature (°C)", "Density (kg/m³)"])
         else:
-            self.input_table.setHorizontalHeaderLabels(["Wt %", "Temperature (°C)"])
+            self.input_table.setHorizontalHeaderLabels(["Wt %", "Temperature (°C)", "Density (kg/m³)"])
     
     def on_density_changed(self, value):
         """Handle density change"""
@@ -630,29 +634,46 @@ class DistillationConverterGUI(QMainWindow):
     
     def on_cell_changed(self, row, column):
         """Handle cell value change"""
-        if column == 1:  # Temperature column
-            try:
-                vol_pct = float(self.input_table.item(row, 0).text())
+        try:
+            vol_pct = float(self.input_table.item(row, 0).text())
+            
+            if column == 1:  # Temperature column
                 temp_text = self.input_table.item(row, 1).text()
                 if temp_text:
                     temp = float(temp_text)
                     self.input_data[vol_pct] = temp
                 elif vol_pct in self.input_data:
                     del self.input_data[vol_pct]
-            except (ValueError, AttributeError):
-                pass
+            
+            elif column == 2:  # Density column
+                dens_text = self.input_table.item(row, 2).text()
+                if dens_text:
+                    density = float(dens_text)
+                    if 600 <= density <= 1200:  # Validate density range
+                        self.input_densities[vol_pct] = density
+                    else:
+                        QMessageBox.warning(self, "Invalid Density", 
+                                          "Density must be between 600-1200 kg/m³")
+                        self.input_table.item(row, 2).setText("")
+                elif vol_pct in self.input_densities:
+                    del self.input_densities[vol_pct]
+        except (ValueError, AttributeError):
+            pass
     
     def add_data_point(self):
         """Add a new data point row"""
         row_count = self.input_table.rowCount()
         self.input_table.insertRow(row_count)
         
-        # Add editable volume % and temperature cells
+        # Add editable volume %, temperature, and density cells
         vol_item = QTableWidgetItem("")
         self.input_table.setItem(row_count, 0, vol_item)
         
         temp_item = QTableWidgetItem("")
         self.input_table.setItem(row_count, 1, temp_item)
+        
+        dens_item = QTableWidgetItem("")
+        self.input_table.setItem(row_count, 2, dens_item)
     
     def remove_data_point(self):
         """Remove selected data point"""
@@ -662,6 +683,8 @@ class DistillationConverterGUI(QMainWindow):
                 vol_pct = float(self.input_table.item(current_row, 0).text())
                 if vol_pct in self.input_data:
                     del self.input_data[vol_pct]
+                if vol_pct in self.input_densities:
+                    del self.input_densities[vol_pct]
             except (ValueError, AttributeError):
                 pass
             self.input_table.removeRow(current_row)
@@ -669,6 +692,7 @@ class DistillationConverterGUI(QMainWindow):
     def clear_all_data(self):
         """Clear all input data"""
         self.input_data.clear()
+        self.input_densities.clear()
         self.update_input_table()
     
     def convert_volume_to_weight_percent(self, vol_percents, densities):
@@ -801,11 +825,21 @@ class DistillationConverterGUI(QMainWindow):
             try:
                 vol_item = self.input_table.item(row, 0)
                 temp_item = self.input_table.item(row, 1)
+                dens_item = self.input_table.item(row, 2)
                 
                 if vol_item and temp_item and temp_item.text():
                     vol_pct = float(vol_item.text())
                     temp = float(temp_item.text())
                     self.input_data[vol_pct] = temp
+                    
+                    # Store per-cut density if provided
+                    if dens_item and dens_item.text():
+                        try:
+                            density = float(dens_item.text())
+                            if 600 <= density <= 1200:
+                                self.input_densities[vol_pct] = density
+                        except ValueError:
+                            pass
             except (ValueError, AttributeError):
                 continue
         
