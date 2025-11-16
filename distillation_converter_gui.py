@@ -1302,6 +1302,9 @@ class DistillationConverterGUI(QMainWindow):
                             dens = float(row[dens_col])
                             if 600 <= dens <= 1200:
                                 self.input_densities[vol] = dens
+                                # Also populate density in table column 2
+                                dens_item = QTableWidgetItem(str(dens))
+                                self.input_table.setItem(row_pos, 2, dens_item)
                         except (ValueError, TypeError):
                             pass
                 except (ValueError, KeyError):
@@ -1312,13 +1315,13 @@ class DistillationConverterGUI(QMainWindow):
             if self.input_densities:
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 if 600 <= avg_density <= 1200:
-                    self.density_input.setValue(avg_density)
+                    self.density_spinbox.setValue(avg_density)
             elif dens_col is not None and len(df) > 0:
                 # Fallback: use first density if per-cut data not available
                 try:
                     density = float(df[dens_col].iloc[0])
                     if 600 <= density <= 1200:
-                        self.density_input.setValue(density)
+                        self.density_spinbox.setValue(density)
                 except (ValueError, TypeError):
                     pass
             
@@ -1412,6 +1415,9 @@ class DistillationConverterGUI(QMainWindow):
                             dens = float(row[dens_col])
                             if 600 <= dens <= 1200:
                                 self.input_densities[vol] = dens
+                                # Also populate density in table column 2
+                                dens_item = QTableWidgetItem(str(dens))
+                                self.input_table.setItem(row_pos, 2, dens_item)
                         except (ValueError, TypeError):
                             pass
                 except (ValueError, KeyError):
@@ -1422,13 +1428,13 @@ class DistillationConverterGUI(QMainWindow):
             if self.input_densities:
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 if 600 <= avg_density <= 1200:
-                    self.density_input.setValue(avg_density)
+                    self.density_spinbox.setValue(avg_density)
             elif dens_col is not None and len(df) > 0:
                 # Fallback: use first density if per-cut data not available
                 try:
                     density = float(df[dens_col].iloc[0])
                     if 600 <= density <= 1200:
-                        self.density_input.setValue(density)
+                        self.density_spinbox.setValue(density)
                 except (ValueError, TypeError):
                     pass
             
