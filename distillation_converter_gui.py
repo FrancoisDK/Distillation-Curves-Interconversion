@@ -21,20 +21,10 @@ import matplotlib
 import numpy as np
 
 # Configure matplotlib to use Windows native theme
-# Automatically detects system light/dark mode
+# Will be properly configured in main() after QApplication is created
 try:
-    # Try to use the system theme - detects Windows 10/11 dark mode
-    matplotlib.rcParams['figure.facecolor'] = 'white'
-    matplotlib.rcParams['axes.facecolor'] = 'white'
-    # Use system-appropriate colors for text
-    if sys.platform == 'win32':
-        # Windows: use default which respects system colors
-        matplotlib.rcParams['text.color'] = 'black'
-        matplotlib.rcParams['axes.labelcolor'] = 'black'
-        matplotlib.rcParams['xtick.color'] = 'black'
-        matplotlib.rcParams['ytick.color'] = 'black'
-        matplotlib.rcParams['axes.edgecolor'] = '#cccccc'
-        matplotlib.rcParams['grid.color'] = '#e0e0e0'
+    # Use Agg backend which works well with PySide6
+    matplotlib.use('Qt5Agg')
 except:
     pass
 
@@ -922,6 +912,21 @@ class DistillationConverterGUI(QMainWindow):
         else:
             input_type_str = "D86"  # Default to D86
         
+        # Determine which density to use based on checkbox state
+        # If "Use spinbox value" is checked, use spinbox; otherwise use table data
+        use_spinbox_density = self.use_spinbox_density.isChecked()
+        
+        if use_spinbox_density:
+            # Use spinbox value for all calculations
+            density_for_oil = self.density_spinbox.value()
+        else:
+            # Use table data - calculate average from per-cut densities
+            if self.input_densities:
+                density_for_oil = sum(self.input_densities.values()) / len(self.input_densities)
+            else:
+                # If no table densities, fall back to spinbox value
+                density_for_oil = self.density_spinbox.value()
+        
         # Prepare data for Oil class (needs list of [vol%, temp] pairs)
         input_data_list = [[vol, temp] for vol, temp in sorted(self.input_data.items())]
         
@@ -930,11 +935,11 @@ class DistillationConverterGUI(QMainWindow):
         if "Weight" in basis:
             vol_percents = [point[0] for point in input_data_list]
             # Convert weight% to volume% using available density values
-            # Try to use per-cut densities if available, otherwise use average density
+            # Try to use per-cut densities if available, otherwise use selected density
             if self.input_densities:
-                density_list = [self.input_densities.get(vp, self.density) for vp in vol_percents]
+                density_list = [self.input_densities.get(vp, density_for_oil) for vp in vol_percents]
             else:
-                density_list = [self.density] * len(vol_percents)
+                density_list = [density_for_oil] * len(vol_percents)
             
             vol_percents_converted = self.convert_weight_to_volume_percent(vol_percents, density_list)
             
@@ -943,8 +948,11 @@ class DistillationConverterGUI(QMainWindow):
                               for i in range(len(input_data_list))]
         
         try:
-            # Create Oil object with the specified input type
-            self.oil_object = Oil(input_data_list, Density=self.density, input_type=input_type_str)
+            # Create Oil object with the specified input type and correct density
+            self.oil_object = Oil(input_data_list, Density=density_for_oil, input_type=input_type_str)
+            
+            # Store the actual density used for display in properties
+            self.actual_density_used = density_for_oil
             
             # Store the input type for proper labeling
             self.current_input_type = input_type
@@ -1024,40 +1032,45 @@ class DistillationConverterGUI(QMainWindow):
         ax.yaxis.set_major_locator(MaxNLocator(10))  # ~10 major divisions
         ax.yaxis.set_minor_locator(AutoMinorLocator(2))  # 2 minor ticks between majors
         
-        # Enhanced grid styling
+        # Get grid color from matplotlib rcParams (respects system theme)
+        grid_color = matplotlib.rcParams['grid.color']
+        edge_color = matplotlib.rcParams['axes.edgecolor']
+        
+        # Enhanced grid styling using theme-aware colors
         # Major vertical grid lines at key distillation points (10, 30, 50, 70, 90%)
         for x_val in [10, 30, 50, 70, 90]:
-            ax.axvline(x=x_val, color='#4682B4', linestyle='--', linewidth=1.5, alpha=0.8, zorder=0)
+            ax.axvline(x=x_val, color=grid_color, linestyle='--', linewidth=1.5, alpha=0.8, zorder=0)
         
         # Minor vertical grid line at 95%
-        ax.axvline(x=95, color='#4682B4', linestyle='--', linewidth=1.0, alpha=0.6, zorder=0)
+        ax.axvline(x=95, color=grid_color, linestyle='--', linewidth=1.0, alpha=0.6, zorder=0)
         
         # Minor horizontal grid lines (temperature)
-        ax.grid(True, which='minor', axis='y', color='#4682B4', linestyle='--', 
+        ax.grid(True, which='minor', axis='y', color=grid_color, linestyle='--', 
                 linewidth=0.7, alpha=0.5, zorder=0)
         
         # Major grid lines (lighter, dotted for subtlety)
-        ax.grid(True, which='major', axis='both', color='#708090', linestyle=':', 
+        ax.grid(True, which='major', axis='both', color=grid_color, linestyle=':', 
                 linewidth=0.8, alpha=0.5, zorder=0)
         
-        # Legend with better styling
+        # Legend with theme-aware styling
         legend = ax.legend(loc='lower right', fontsize=11, frameon=True, 
-                          shadow=True, fancybox=True, framealpha=0.98)
-        legend.get_frame().set_facecolor('#FFFEF7')
-        legend.get_frame().set_edgecolor('#8B7355')
+                          shadow=True, fancybox=True, framealpha=0.95)
+        # Use background color from matplotlib rcParams for legend frame
+        legend.get_frame().set_facecolor(matplotlib.rcParams['axes.facecolor'])
+        legend.get_frame().set_edgecolor(edge_color)
         
-        # Add paper-like background color (soft cream/off-white)
-        ax.set_facecolor('#FFFEF7')
-        self.figure.patch.set_facecolor('#FFF8E7')
+        # Background colors now come from matplotlib rcParams (set in main())
+        # Figure and axes colors are already set in main() via rcParams
+        # No need to override them here - they adapt to system theme
         
         # Enhance tick labels
         ax.tick_params(axis='both', which='major', labelsize=10, length=6, width=1.2)
         ax.tick_params(axis='both', which='minor', length=3, width=0.8)
         
-        # Add border styling
+        # Border styling using theme-aware edge color
         for spine in ax.spines.values():
             spine.set_linewidth(1.2)
-            spine.set_color('#8B7355')
+            spine.set_color(edge_color)
         
         self.figure.tight_layout()
         self.canvas.draw()
@@ -1104,8 +1117,11 @@ class DistillationConverterGUI(QMainWindow):
         if not self.oil_object:
             return
         
+        # Use the actual density that was used in the calculation
+        density_display = getattr(self, 'actual_density_used', self.density)
+        
         properties = [
-            ("Density", f"{self.density:.1f} kg/m³"),
+            ("Density", f"{density_display:.1f} kg/m³"),
             ("Specific Gravity", f"{self.oil_object.SG:.4f}"),
             ("VABP (Volume Average BP)", f"{self.oil_object.VABP:.2f} °F"),
             ("MeABP (Mean Average BP)", f"{self.oil_object.MeABP:.2f} °F"),
@@ -1528,21 +1544,6 @@ def main():
     """Main application entry point with full Windows native theming"""
     app = QApplication(sys.argv)
     
-    # Configure matplotlib to respect PySide6 theme after QApplication is created
-    # This ensures charts match the application UI style
-    palette = app.palette()
-    # Use the correct QPalette color roles
-    text_color = palette.color(QPalette.ColorRole.WindowText)
-    bg_color = palette.color(QPalette.ColorRole.Window)
-    
-    # Update matplotlib colors to match system theme
-    matplotlib.rcParams['figure.facecolor'] = bg_color.name()
-    matplotlib.rcParams['axes.facecolor'] = bg_color.name()
-    matplotlib.rcParams['text.color'] = text_color.name()
-    matplotlib.rcParams['axes.labelcolor'] = text_color.name()
-    matplotlib.rcParams['xtick.color'] = text_color.name()
-    matplotlib.rcParams['ytick.color'] = text_color.name()
-    
     # Use native Windows theme - automatically adapts to system light/dark theme
     try:
         # Try to use Windows 11 style first (most modern)
@@ -1557,6 +1558,32 @@ def main():
                 app.setStyle('Windows')
             except:
                 pass  # Use default system style
+    
+    # Configure matplotlib to respect PySide6 theme after QApplication and style are set
+    palette = app.palette()
+    text_color = palette.color(QPalette.ColorRole.WindowText)
+    bg_color = palette.color(QPalette.ColorRole.Window)
+    
+    # Calculate luminosity of background to determine if light or dark theme
+    # Using relative luminance formula: 0.299*R + 0.587*G + 0.114*B
+    bg_luminance = (0.299 * bg_color.red() + 0.587 * bg_color.green() + 0.114 * bg_color.blue()) / 255.0
+    text_luminance = (0.299 * text_color.red() + 0.587 * text_color.green() + 0.114 * text_color.blue()) / 255.0
+    
+    # Set matplotlib colors based on detected theme
+    matplotlib.rcParams['figure.facecolor'] = bg_color.name()
+    matplotlib.rcParams['axes.facecolor'] = bg_color.name()
+    matplotlib.rcParams['text.color'] = text_color.name()
+    matplotlib.rcParams['axes.labelcolor'] = text_color.name()
+    matplotlib.rcParams['xtick.color'] = text_color.name()
+    matplotlib.rcParams['ytick.color'] = text_color.name()
+    
+    # Set grid and spine colors based on theme
+    if bg_luminance > 0.5:  # Light theme
+        matplotlib.rcParams['axes.edgecolor'] = '#cccccc'
+        matplotlib.rcParams['grid.color'] = '#e0e0e0'
+    else:  # Dark theme
+        matplotlib.rcParams['axes.edgecolor'] = '#444444'
+        matplotlib.rcParams['grid.color'] = '#333333'
     
     window = DistillationConverterGUI()
     window.show()
