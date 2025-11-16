@@ -1311,13 +1311,14 @@ class DistillationConverterGUI(QMainWindow):
                     # Skip rows with invalid data
                     continue
             
-            # Update density field with average of per-cut densities
+            # Display average density in spinbox for reference
+            # Per-cut densities from table column 2 are used for actual conversions
             if self.input_densities:
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 if 600 <= avg_density <= 1200:
                     self.density_spinbox.setValue(avg_density)
             elif dens_col is not None and len(df) > 0:
-                # Fallback: use first density if per-cut data not available
+                # If per-cut density data wasn't valid, use first value
                 try:
                     density = float(df[dens_col].iloc[0])
                     if 600 <= density <= 1200:
@@ -1424,13 +1425,14 @@ class DistillationConverterGUI(QMainWindow):
                     # Skip rows with invalid data
                     continue
             
-            # Update density field with average of per-cut densities
+            # Display average density in spinbox for reference
+            # Per-cut densities from table column 2 are used for actual conversions
             if self.input_densities:
                 avg_density = sum(self.input_densities.values()) / len(self.input_densities)
                 if 600 <= avg_density <= 1200:
                     self.density_spinbox.setValue(avg_density)
             elif dens_col is not None and len(df) > 0:
-                # Fallback: use first density if per-cut data not available
+                # If per-cut density data wasn't valid, use first value
                 try:
                     density = float(df[dens_col].iloc[0])
                     if 600 <= density <= 1200:
