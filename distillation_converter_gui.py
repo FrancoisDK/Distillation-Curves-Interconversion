@@ -1558,9 +1558,6 @@ def main():
             except:
                 pass  # Use default system style
     
-    # Use system color palette for proper light/dark theme support
-    app.setApplicationStyle(app.style())
-    
     window = DistillationConverterGUI()
     window.show()
     
