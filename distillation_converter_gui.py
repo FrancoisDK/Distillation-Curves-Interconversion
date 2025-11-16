@@ -671,10 +671,132 @@ class DistillationConverterGUI(QMainWindow):
         self.input_data.clear()
         self.update_input_table()
     
+    def convert_volume_to_weight_percent(self, vol_percents, densities):
+        """
+        Convert volume % to weight % using per-cut density values.
+        
+        If a single density is provided, it's used for all cuts.
+        If per-cut densities are provided, they're used individually.
+        
+        Parameters:
+        vol_percents: list of volume percentages [0, 10, 30, 50, 70, 90, 95]
+        densities: float (constant) or list of floats (per-cut)
+        
+        Returns:
+        list of weight percentages corresponding to input volume percentages
+        """
+        if not vol_percents:
+            return []
+        
+        # Handle single density value (applies to all cuts)
+        if isinstance(densities, (int, float)):
+            density_values = [densities] * len(vol_percents)
+        else:
+            # Assume it's a list/dict of per-cut densities
+            density_values = densities if isinstance(densities, list) else [densities] * len(vol_percents)
+        
+        # Cumulative volume and weight calculations
+        # Assume linear density variation between cuts
+        weight_percents = []
+        cumulative_weight = 0.0
+        total_mass = 0.0
+        
+        # First pass: calculate total mass based on volumes and densities
+        for i in range(len(vol_percents)):
+            if i == 0:
+                vol_slice = vol_percents[i]
+            else:
+                vol_slice = vol_percents[i] - vol_percents[i-1]
+            
+            density = density_values[i] if i < len(density_values) else density_values[-1]
+            mass_slice = vol_slice * density  # mass is proportional to volume * density
+            total_mass += mass_slice
+        
+        # Second pass: convert to weight percentages
+        cumulative_mass = 0.0
+        for i in range(len(vol_percents)):
+            if i == 0:
+                vol_slice = vol_percents[i]
+            else:
+                vol_slice = vol_percents[i] - vol_percents[i-1]
+            
+            density = density_values[i] if i < len(density_values) else density_values[-1]
+            mass_slice = vol_slice * density
+            cumulative_mass += mass_slice
+            
+            if total_mass > 0:
+                wt_pct = (cumulative_mass / total_mass) * 100
+            else:
+                wt_pct = vol_percents[i]  # Fallback to vol% if calculation fails
+            
+            weight_percents.append(wt_pct)
+        
+        return weight_percents
+    
+    def convert_weight_to_volume_percent(self, wt_percents, densities):
+        """
+        Convert weight % to volume % using per-cut density values.
+        
+        Parameters:
+        wt_percents: list of weight percentages
+        densities: float (constant) or list of floats (per-cut)
+        
+        Returns:
+        list of volume percentages corresponding to input weight percentages
+        """
+        if not wt_percents:
+            return []
+        
+        # Handle single density value
+        if isinstance(densities, (int, float)):
+            density_values = [densities] * len(wt_percents)
+        else:
+            density_values = densities if isinstance(densities, list) else [densities] * len(wt_percents)
+        
+        # Reverse calculation: from weight% to volume%
+        volume_percents = []
+        cumulative_volume = 0.0
+        total_volume = 0.0
+        
+        # First pass: calculate total volume
+        for i in range(len(wt_percents)):
+            if i == 0:
+                wt_slice = wt_percents[i]
+            else:
+                wt_slice = wt_percents[i] - wt_percents[i-1]
+            
+            density = density_values[i] if i < len(density_values) else density_values[-1]
+            # mass ∝ wt_slice, volume = mass/density
+            vol_slice = wt_slice / density if density > 0 else wt_slice
+            total_volume += vol_slice
+        
+        # Second pass: convert to volume percentages
+        cumulative_volume = 0.0
+        for i in range(len(wt_percents)):
+            if i == 0:
+                wt_slice = wt_percents[i]
+            else:
+                wt_slice = wt_percents[i] - wt_percents[i-1]
+            
+            density = density_values[i] if i < len(density_values) else density_values[-1]
+            vol_slice = wt_slice / density if density > 0 else wt_slice
+            cumulative_volume += vol_slice
+            
+            if total_volume > 0:
+                vol_pct = (cumulative_volume / total_volume) * 100
+            else:
+                vol_pct = wt_percents[i]  # Fallback
+            
+            volume_percents.append(vol_pct)
+        
+        return volume_percents
+    
     def calculate_conversions(self):
         """Perform the distillation curve conversions"""
         # Collect all input data
         self.input_data.clear()
+        self.input_densities = {}  # Store per-cut density values if available
+        
         for row in range(self.input_table.rowCount()):
             try:
                 vol_item = self.input_table.item(row, 0)
@@ -693,8 +815,9 @@ class DistillationConverterGUI(QMainWindow):
                               "Please enter at least 3 data points for conversion.")
             return
         
-        # Get input type
+        # Get input type and basis
         input_type = self.input_type_combo.currentText()
+        basis = self.basis_combo.currentText()
         
         # Extract the actual type (D86, D2887, or TBP) from the combo box text
         if "D86" in input_type:
@@ -708,6 +831,23 @@ class DistillationConverterGUI(QMainWindow):
         
         # Prepare data for Oil class (needs list of [vol%, temp] pairs)
         input_data_list = [[vol, temp] for vol, temp in sorted(self.input_data.items())]
+        
+        # Handle basis conversion if needed
+        # If input is in Weight %, convert to Volume % for internal calculations
+        if "Weight" in basis:
+            vol_percents = [point[0] for point in input_data_list]
+            # Convert weight% to volume% using available density values
+            # Try to use per-cut densities if available, otherwise use average density
+            if self.input_densities:
+                density_list = [self.input_densities.get(vp, self.density) for vp in vol_percents]
+            else:
+                density_list = [self.density] * len(vol_percents)
+            
+            vol_percents_converted = self.convert_weight_to_volume_percent(vol_percents, density_list)
+            
+            # Update input_data_list with converted volume percentages
+            input_data_list = [[vol_percents_converted[i], input_data_list[i][1]] 
+                              for i in range(len(input_data_list))]
         
         try:
             # Create Oil object with the specified input type
@@ -1105,7 +1245,8 @@ class DistillationConverterGUI(QMainWindow):
             # Clear existing data
             self.input_table.setRowCount(0)
             
-            # Import data
+            # Import data and store per-cut densities if available
+            self.input_densities = {}  # Store per-cut density values
             for idx, row in df.iterrows():
                 try:
                     vol = float(row[vol_col])
@@ -1120,12 +1261,26 @@ class DistillationConverterGUI(QMainWindow):
                     
                     self.input_table.setItem(row_pos, 0, vol_item)
                     self.input_table.setItem(row_pos, 1, temp_item)
+                    
+                    # Store per-cut density if available
+                    if dens_col is not None:
+                        try:
+                            dens = float(row[dens_col])
+                            if 600 <= dens <= 1200:
+                                self.input_densities[vol] = dens
+                        except (ValueError, TypeError):
+                            pass
                 except (ValueError, KeyError):
                     # Skip rows with invalid data
                     continue
             
-            # Update density if available
-            if dens_col is not None and len(df) > 0:
+            # Update density field with average of per-cut densities
+            if self.input_densities:
+                avg_density = sum(self.input_densities.values()) / len(self.input_densities)
+                if 600 <= avg_density <= 1200:
+                    self.density_input.setValue(avg_density)
+            elif dens_col is not None and len(df) > 0:
+                # Fallback: use first density if per-cut data not available
                 try:
                     density = float(df[dens_col].iloc[0])
                     if 600 <= density <= 1200:
@@ -1143,8 +1298,10 @@ class DistillationConverterGUI(QMainWindow):
                 self.input_type_combo.setCurrentText("D86")
             
             rows_imported = self.input_table.rowCount()
+            density_info = f" ({len(self.input_densities)} cuts with per-cut density)" if self.input_densities else ""
             QMessageBox.information(self, "Import Successful",
-                f"Imported {rows_imported} data points from CSV")
+                f"Imported {rows_imported} data points from CSV{density_info}")
+
             
         except Exception as e:
             QMessageBox.critical(self, "Import Error",
@@ -1198,7 +1355,8 @@ class DistillationConverterGUI(QMainWindow):
             # Clear existing data
             self.input_table.setRowCount(0)
             
-            # Import data
+            # Import data and store per-cut densities if available
+            self.input_densities = {}  # Store per-cut density values
             for idx, row in df.iterrows():
                 try:
                     vol = float(row[vol_col])
@@ -1213,12 +1371,26 @@ class DistillationConverterGUI(QMainWindow):
                     
                     self.input_table.setItem(row_pos, 0, vol_item)
                     self.input_table.setItem(row_pos, 1, temp_item)
+                    
+                    # Store per-cut density if available
+                    if dens_col is not None:
+                        try:
+                            dens = float(row[dens_col])
+                            if 600 <= dens <= 1200:
+                                self.input_densities[vol] = dens
+                        except (ValueError, TypeError):
+                            pass
                 except (ValueError, KeyError):
                     # Skip rows with invalid data
                     continue
             
-            # Update density if available
-            if dens_col is not None and len(df) > 0:
+            # Update density field with average of per-cut densities
+            if self.input_densities:
+                avg_density = sum(self.input_densities.values()) / len(self.input_densities)
+                if 600 <= avg_density <= 1200:
+                    self.density_input.setValue(avg_density)
+            elif dens_col is not None and len(df) > 0:
+                # Fallback: use first density if per-cut data not available
                 try:
                     density = float(df[dens_col].iloc[0])
                     if 600 <= density <= 1200:
@@ -1236,8 +1408,9 @@ class DistillationConverterGUI(QMainWindow):
                 self.input_type_combo.setCurrentText("D86")
             
             rows_imported = self.input_table.rowCount()
+            density_info = f" ({len(self.input_densities)} cuts with per-cut density)" if self.input_densities else ""
             QMessageBox.information(self, "Import Successful",
-                f"Imported {rows_imported} data points from Excel")
+                f"Imported {rows_imported} data points from Excel{density_info}")
             
         except Exception as e:
             QMessageBox.critical(self, "Import Error",
